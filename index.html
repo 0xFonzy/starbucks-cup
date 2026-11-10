@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Holiday Cup Puzzle</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;600;700&display=swap">
+<style>
+  /* Layout: one narrow column; the evergreen tray holding the board is the only framed object. */
+  :root {
+    --page: #edf2ee;
+    --ink: #12332a;
+    --ink-soft: #4a655c;
+    --line: #cbd8d1;
+    --tray: #174c3d;
+    --tray-ink: #f6f1e4;
+    --berry: #c2233b;
+    --berry-ink: #ffffff;
+    --gold: #f2b233;
+    --blank: #ffffff;
+    --blank-edge: #b9c7c0;
+    --shadow: rgba(4, 22, 17, .4);
+    --display: "Caprasimo", "Cooper Black", Georgia, serif;
+    --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #0c1f1a;
+      --ink: #eef3ec;
+      --ink-soft: #a4b8ae;
+      --line: #2a4239;
+      --tray: #185040;
+      --tray-ink: #f6f1e4;
+      --berry: #ee6074;
+      --berry-ink: #2a0409;
+      --gold: #f6c453;
+      --blank: #f6f1e4;
+      --blank-edge: #b3bfb6;
+      --shadow: rgba(0, 0, 0, .55);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0c1f1a;
+    --ink: #eef3ec;
+    --ink-soft: #a4b8ae;
+    --line: #2a4239;
+    --tray: #185040;
+    --tray-ink: #f6f1e4;
+    --berry: #ee6074;
+    --berry-ink: #2a0409;
+    --gold: #f6c453;
+    --blank: #f6f1e4;
+    --blank-edge: #b3bfb6;
+    --shadow: rgba(0, 0, 0, .55);
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font: 400 16px/1.5 var(--body);
+  }
+  .wrap {
+    max-width: 460px;
+    margin: 0 auto;
+    padding-block: 28px 40px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .head { display: flex; flex-direction: column; gap: 6px; }
+  h1 {
+    margin: 0;
+    font: 400 clamp(30px, 9vw, 40px)/1.05 var(--display);
+    letter-spacing: -.01em;
+    text-wrap: balance;
+  }
+  .how { margin: 0; color: var(--ink-soft); max-width: 40ch; }
+
+  .tray {
+    background: var(--tray);
+    border-radius: 22px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 14px 30px -18px var(--shadow);
+  }
+  .board {
+    --gap: 6px;
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 1;
+    border-radius: 12px;
+  }
+  .tile {
+    position: absolute;
+    left: calc(var(--c) * (100% + var(--gap)) / 3);
+    top: calc(var(--r) * (100% + var(--gap)) / 3);
+    width: calc((100% - 2 * var(--gap)) / 3);
+    height: calc((100% - 2 * var(--gap)) / 3);
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--blank);
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      left .24s cubic-bezier(.2, .8, .2, 1),
+      top .24s cubic-bezier(.2, .8, .2, 1),
+      width .4s ease, height .4s ease, border-radius .4s ease,
+      transform .15s ease, box-shadow .15s ease;
+  }
+  .tile svg { display: block; width: 100%; height: 100%; pointer-events: none; }
+  .tile:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; z-index: 3; }
+  .tile[aria-pressed="true"] {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 4px var(--gold), 0 12px 24px var(--shadow);
+    z-index: 2;
+  }
+  .tile.nope { animation: nope .32s ease; }
+  @keyframes nope {
+    25% { transform: translateX(-5px); }
+    60% { transform: translateX(5px); }
+    85% { transform: translateX(-2px); }
+  }
+
+  .blank svg { opacity: 0; transition: opacity .4s ease; }
+  .blank::before {
+    content: "";
+    position: absolute;
+    inset: 9px;
+    border: 2px dashed var(--blank-edge);
+    border-radius: 6px;
+    transition: border-color .15s ease, opacity .3s ease;
+  }
+  .board.armed .blank::before { border-color: var(--berry); animation: invite 1s ease-in-out infinite; }
+  @keyframes invite { 50% { inset: 14px; } }
+
+  .full {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 4;
+  }
+  .board.solved { --gap: 0px; overflow: hidden; }
+  .board.solved .tile { border-radius: 0; cursor: default; }
+  .board.solved .blank svg { opacity: 1; }
+  .board.solved .blank::before { opacity: 0; }
+  .board.solved .full { opacity: 1; transition: opacity .35s ease .4s; }
+
+  .status {
+    margin: 0;
+    min-height: 3em;
+    padding: 0 4px 2px;
+    color: var(--tray-ink);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+  }
+
+  .meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .stats { display: flex; gap: 28px; margin: 0; }
+  .stats dt {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .stats dd {
+    margin: 0;
+    font: 400 30px/1.1 var(--display);
+    font-variant-numeric: tabular-nums;
+  }
+  .goal { margin: 0; display: flex; align-items: center; gap: 10px; color: var(--ink-soft); font-size: 13px; line-height: 1.25; }
+  .goal figcaption { max-width: 8ch; text-align: right; }
+  .goal svg { width: 68px; height: 68px; border-radius: 10px; display: block; flex: none; }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 16px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+  .btn {
+    font: 700 16px/1 var(--body);
+    color: var(--berry-ink);
+    background: var(--berry);
+    border: 0;
+    border-radius: 999px;
+    padding: 15px 26px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible, .mode input:focus-visible + span { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .mode { border: 0; padding: 0; margin: 0; min-width: min-content; flex: 1 1 auto; }
+  .mode legend { padding: 0; margin-bottom: 6px; font-size: 13px; color: var(--ink-soft); }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 3px; }
+  .seg label { flex: 1 1 auto; cursor: pointer; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg span {
+    display: block;
+    text-align: center;
+    padding: 9px 10px;
+    white-space: nowrap;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+  .seg input:checked + span { background: var(--ink); color: var(--page); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile, .blank svg, .blank::before, .full { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- The picture. Drawn once here; every tile shows a 200×200 window onto it. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="night" cx="50%" cy="56%" r="62%">
+      <stop offset="0" stop-color="#2c7d63"/>
+      <stop offset="1" stop-color="#0e3a30"/>
+    </radialGradient>
+    <mask id="crescent">
+      <rect width="600" height="600" fill="#fff"/>
+      <circle cx="521" cy="112" r="30" fill="#000"/>
+    </mask>
+    <g id="scene">
+      <rect width="600" height="600" fill="url(#night)"/>
+      <circle cx="300" cy="350" r="190" fill="#ffffff" opacity=".05"/>
+
+      <!-- snow -->
+      <g fill="#fff4dc" opacity=".9">
+        <circle cx="60" cy="20" r="3"/><circle cx="150" cy="40" r="4"/><circle cx="170" cy="170" r="3.5"/>
+        <circle cx="30" cy="196" r="3"/><circle cx="240" cy="30" r="3"/><circle cx="352" cy="112" r="4"/>
+        <circle cx="230" cy="124" r="3"/><circle cx="412" cy="100" r="3"/><circle cx="458" cy="158" r="4"/>
+        <circle cx="572" cy="182" r="3.5"/><circle cx="420" cy="184" r="2.5"/><circle cx="20" cy="262" r="4"/>
+        <circle cx="172" cy="240" r="3"/><circle cx="180" cy="332" r="4"/><circle cx="28" cy="352" r="3"/>
+        <circle cx="432" cy="250" r="4"/><circle cx="580" cy="272" r="3"/><circle cx="422" cy="342" r="3"/>
+        <circle cx="590" cy="362" r="4"/><circle cx="438" cy="418" r="3"/><circle cx="20" cy="432" r="3"/>
+        <circle cx="182" cy="442" r="4"/><circle cx="190" cy="474" r="3"/><circle cx="410" cy="470" r="3.5"/>
+        <circle cx="590" cy="452" r="3"/>
+      </g>
+
+      <!-- table -->
+      <rect y="505" width="600" height="95" fill="#7b4a2e"/>
+      <rect y="505" width="600" height="10" fill="#9a6442"/>
+      <path d="M0 546H170M262 566H600M40 584H420" stroke="#693c24" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+      <!-- string lights -->
+      <path d="M-10 48Q150 120 300 70T610 40" fill="none" stroke="#06221b" stroke-width="4"/>
+      <g>
+        <g transform="translate(37.8 66.9)"><rect x="-4" width="8" height="8" fill="#06221b"/><ellipse cy="19" rx="9" ry="12" fill="#e4374b"/></g>
+        <g transform="translate(116.4 86.1)"><rect x="-4" width="8" height="8" fill="#06221b"/><ellipse cy="19" rx="9" ry="12" fill="#f4b942"/></g>
+        <g transform="translate(178.4 90.5)"><rect x="-4" width="8" height="8" fill="#06221b"/><ellipse cy="19" rx="9" ry="12" fill="#fff4dc"/></g>
+        <g transform="translate(437 39.2)"><rect x="-4" width="8" height="8" fill="#06221b"/><ellipse cy="19" rx="9" ry="12" fill="#f4b942"/></g>
+        <g transform="translate(514.9 34.3)"><rect x="-4" width="8" height="8" fill="#06221b"/><ellipse cy="19" rx="9" ry="12" fill="#e4374b"/></g>
+        <g transform="translate(587.7 37.5)"><rect x="-4" width="8" height="8" fill="#06221b"/><ellipse cy="19" rx="9" ry="12" fill="#fff4dc"/></g>
+      </g>
+
+      <!-- snowflake -->
+      <g transform="translate(88 158)" stroke="#fff4dc" stroke-width="5" stroke-linecap="round" fill="none">
+        <path d="M0-30V30M-26-15L26 15M-26 15L26-15"/>
+        <path d="M-8-22L0-14L8-22M-8 22L0 14L8 22" stroke-width="3.5"/>
+      </g>
+
+      <!-- moon -->
+      <circle cx="505" cy="126" r="34" fill="#fff4dc" mask="url(#crescent)"/>
+
+      <!-- candy cane -->
+      <g transform="rotate(-12 100 330)" fill="none">
+        <path d="M70 378V268a30 30 0 0 1 60 0v14" stroke="#fff4dc" stroke-width="24" stroke-linecap="round"/>
+        <path d="M70 378V268a30 30 0 0 1 60 0v14" stroke="#d32f45" stroke-width="24" stroke-dasharray="14 16"/>
+      </g>
+
+      <!-- tree -->
+      <path d="M474 482h72l-9 62h-54z" fill="#b5532f"/>
+      <rect x="468" y="476" width="84" height="14" rx="4" fill="#cf6a40"/>
+      <path d="M510 385L578 482H442Z" fill="#33875f"/>
+      <path d="M510 340L566 424H454Z" fill="#3f9e76"/>
+      <path d="M510 300L556 372H464Z" fill="#4fb286"/>
+      <circle cx="495" cy="358" r="7" fill="#e4374b"/><circle cx="530" cy="402" r="7" fill="#f4b942"/>
+      <circle cx="478" cy="444" r="7" fill="#fff4dc"/><circle cx="542" cy="458" r="7" fill="#e4374b"/>
+      <circle cx="508" cy="432" r="7" fill="#f4b942"/>
+      <polygon points="510,270 515,283.1 529,283.8 518.1,292.6 521.8,306.2 510,298.5 498.2,306.2 501.9,292.6 491,283.8 505,283.1" fill="#f4b942"/>
+
+      <!-- gift -->
+      <rect x="52" y="452" width="104" height="92" rx="6" fill="#fff4dc"/>
+      <rect x="44" y="436" width="120" height="26" rx="6" fill="#efdfba"/>
+      <rect x="96" y="436" width="16" height="108" fill="#d32f45"/>
+      <ellipse cx="86" cy="424" rx="20" ry="11" transform="rotate(25 86 424)" fill="#d32f45"/>
+      <ellipse cx="122" cy="424" rx="20" ry="11" transform="rotate(-25 122 424)" fill="#d32f45"/>
+      <circle cx="104" cy="432" r="8" fill="#a81d32"/>
+
+      <!-- steam -->
+      <g fill="none" stroke="#fff4dc" stroke-width="7" stroke-linecap="round" opacity=".85">
+        <path d="M272 148q-14-18 0-36t0-36t0-36"/>
+        <path d="M300 146q14-20 0-40t0-40t0-36"/>
+        <path d="M328 148q-14-18 0-36t0-36"/>
+      </g>
+
+      <!-- cup -->
+      <ellipse cx="300" cy="524" rx="112" ry="14" fill="#000" opacity=".28"/>
+      <path d="M212 222H388L368 512Q368 522 358 522H242Q232 522 232 512Z" fill="#c9263d"/>
+      <path d="M352 222H388L368 512Q368 522 358 522H336Z" fill="#a81d32"/>
+      <g fill="#fff4dc">
+        <circle cx="240" cy="250" r="4"/><circle cx="274" cy="272" r="3"/><circle cx="312" cy="248" r="4"/>
+        <circle cx="340" cy="278" r="3"/><circle cx="252" cy="452" r="3"/><circle cx="288" cy="478" r="4"/>
+        <circle cx="322" cy="448" r="3"/><circle cx="262" cy="500" r="3"/><circle cx="318" cy="500" r="4"/>
+      </g>
+      <path d="M214 300H386L378 420H222Z" fill="#d9b48a"/>
+      <path d="M356 300H386L378 420H350Z" fill="#c59f73"/>
+      <circle cx="300" cy="360" r="40" fill="#fff4dc"/>
+      <path d="M300 332L318 358H308L322 378H278L292 358H282Z" fill="#1f6b53"/>
+      <rect x="296" y="378" width="8" height="9" fill="#7b4a2e"/>
+      <rect x="218" y="160" width="164" height="36" rx="12" fill="#fff4dc"/>
+      <rect x="196" y="186" width="208" height="40" rx="12" fill="#fff4dc"/>
+      <rect x="196" y="213" width="208" height="13" rx="6.5" fill="#e3d4b4"/>
+      <ellipse cx="334" cy="172" rx="12" ry="4" fill="#cdbd9b"/>
+    </g>
+  </defs>
+</svg>
+
+<main class="wrap">
+  <header class="head">
+    <h1>Holiday Cup Puzzle</h1>
+    <p class="how">Tap a picture tile, then tap the white square to move it there. Put all nine squares back in order to finish the picture.</p>
+  </header>
+
+  <section class="tray" aria-label="Puzzle">
+    <div class="board" id="board" role="group" aria-label="Puzzle board, 3 by 3">
+      <svg class="full" viewBox="0 0 600 600" aria-hidden="true"><use href="#scene"/></svg>
+    </div>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <div class="meta">
+    <dl class="stats">
+      <div><dt>Moves</dt><dd id="moves">0</dd></div>
+      <div><dt>Time</dt><dd id="time">0:00</dd></div>
+    </dl>
+    <figure class="goal">
+      <figcaption>Finished picture</figcaption>
+      <svg viewBox="0 0 600 600" role="img" aria-label="The finished picture: a red holiday cup on a table, with a gift, a small tree, a candy cane and string lights"><use href="#scene"/></svg>
+    </figure>
+  </div>
+
+  <div class="controls">
+    <button type="button" class="btn" id="shuffle">Shuffle</button>
+    <fieldset class="mode">
+      <legend>Which tiles can move?</legend>
+      <div class="seg">
+        <label><input type="radio" name="mode" id="mode-slide" value="slide" checked><span>Next to white</span></label>
+        <label><input type="radio" name="mode" id="mode-any" value="any"><span>Any tile</span></label>
+      </div>
+    </fieldset>
+  </div>
+</main>
+
+<script>
+(function () {
+  var SIZE = 3, COUNT = SIZE * SIZE, BLANK = COUNT - 1;
+  var SVG = 'http://www.w3.org/2000/svg';
+
+  var board = document.getElementById('board');
+  var statusEl = document.getElementById('status');
+  var movesEl = document.getElementById('moves');
+  var timeEl = document.getElementById('time');
+  var shuffleBtn = document.getElementById('shuffle');
+  var modeInputs = document.querySelectorAll('input[name="mode"]');
+
+  // order[position] = tile id. Tile ids are their home positions; BLANK is the white square.
+  var order = [], moves = 0, elapsed = 0, mode = 'slide', selected = null, solved = false, timer = null;
+  var tiles = [];
+
+  for (var id = 0; id < COUNT; id++) tiles.push(makeTile(id));
+
+  function makeTile(id) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = id === BLANK ? 'tile blank' : 'tile';
+    var svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('viewBox', (id % SIZE) * 200 + ' ' + Math.floor(id / SIZE) * 200 + ' 200 200');
+    svg.setAttribute('aria-hidden', 'true');
+    var use = document.createElementNS(SVG, 'use');
+    use.setAttribute('href', '#scene');
+    svg.appendChild(use);
+    btn.appendChild(svg);
+    btn.addEventListener('click', function () { tap(id); });
+    btn.addEventListener('animationend', function () { btn.classList.remove('nope'); });
+    board.appendChild(btn);
+    return btn;
+  }
+
+  function posOf(id) { return order.indexOf(id); }
+  function touching(a, b) {
+    return Math.abs(a % SIZE - b % SIZE) + Math.abs(Math.floor(a / SIZE) - Math.floor(b / SIZE)) === 1;
+  }
+  function isSolved() { return order.every(function (id, pos) { return id === pos; }); }
+  function clock(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function say(text) { statusEl.textContent = text; }
+  function prompt() {
+    return mode === 'slide' ? 'Pick a tile next to the white square.' : 'Pick any picture tile.';
+  }
+
+  function render() {
+    order.forEach(function (id, pos) {
+      var el = tiles[id], row = Math.floor(pos / SIZE), col = pos % SIZE;
+      el.style.setProperty('--r', row);
+      el.style.setProperty('--c', col);
+      var where = 'row ' + (row + 1) + ', column ' + (col + 1);
+      if (id === BLANK) {
+        el.setAttribute('aria-label', (solved ? 'Last piece, ' : 'White square, ') + where);
+      } else {
+        el.setAttribute('aria-label', 'Picture tile ' + (id + 1) + ', ' + where);
+        el.setAttribute('aria-pressed', String(selected === id));
+      }
+    });
+    board.classList.toggle('armed', selected !== null);
+    board.classList.toggle('solved', solved);
+    movesEl.textContent = moves;
+    timeEl.textContent = clock(elapsed);
+    shuffleBtn.textContent = solved ? 'Play again' : 'Shuffle';
+  }
+
+  function startClock() {
+    if (timer) return;
+    timer = setInterval(function () { elapsed++; timeEl.textContent = clock(elapsed); }, 1000);
+  }
+  function stopClock() { clearInterval(timer); timer = null; }
+
+  function tap(id) {
+    if (solved) return;
+    if (id === BLANK) {
+      if (selected === null) say('Pick a picture tile first, then tap the white square.');
+      else move(selected);
+      return;
+    }
+    if (selected === id) {
+      selected = null;
+      say(prompt());
+    } else if (mode === 'slide' && !touching(posOf(id), posOf(BLANK))) {
+      selected = null;
+      tiles[id].classList.add('nope');
+      say('That tile isn’t touching the white square. Pick one right next to it.');
+    } else {
+      selected = id;
+      say('Now tap the white square to move it there.');
+    }
+    render();
+  }
+
+  function move(id) {
+    var from = posOf(id), to = posOf(BLANK);
+    order[to] = id;
+    order[from] = BLANK;
+    selected = null;
+    moves++;
+    startClock();
+    if (isSolved()) {
+      solved = true;
+      stopClock();
+      say('Picture complete! ' + moves + (moves === 1 ? ' move' : ' moves') + ' in ' + clock(elapsed) + '.');
+    } else {
+      say(prompt());
+    }
+    render();
+  }
+
+  // Scramble by sliding the white square around at random, so every shuffle can be solved
+  // under the strict "next to white" rule too.
+  function shuffle() {
+    do {
+      order = [];
+      for (var i = 0; i < COUNT; i++) order.push(i);
+      var blank = BLANK, last = -1;
+      for (var step = 0; step < 90; step++) {
+        var options = [];
+        for (var p = 0; p < COUNT; p++) if (p !== last && touching(p, blank)) options.push(p);
+        var next = options[Math.floor(Math.random() * options.length)];
+        order[blank] = order[next];
+        order[next] = BLANK;
+        last = blank;
+        blank = next;
+      }
+    } while (isSolved());
+    moves = 0; elapsed = 0; selected = null; solved = false;
+    stopClock();
+    say(prompt());
+    render();
+  }
+
+  shuffleBtn.addEventListener('click', shuffle);
+  modeInputs.forEach(function (input) {
+    input.addEventListener('change', function () {
+      if (!input.checked) return;
+      mode = input.value;
+      if (solved) return;
+      if (selected !== null && mode === 'slide' && !touching(posOf(selected), posOf(BLANK))) selected = null;
+      say(selected === null ? prompt() : 'Now tap the white square to move it there.');
+      render();
+    });
+  });
+
+  // Start a fresh game, or pick up a game in progress when the page is updated in place.
+  function start(saved) {
+    var ok = saved && Array.isArray(saved.order) && saved.order.length === COUNT &&
+      saved.order.slice().sort().join() === '0,1,2,3,4,5,6,7,8';
+    if (!ok) { shuffle(); return; }
+    order = saved.order.slice();
+    moves = saved.moves | 0;
+    elapsed = saved.elapsed | 0;
+    mode = saved.mode === 'any' ? 'any' : 'slide';
+    modeInputs.forEach(function (input) { input.checked = input.value === mode; });
+    solved = isSolved();
+    if (moves > 0 && !solved) startClock();
+    say(solved ? 'Picture complete! ' + moves + ' moves in ' + clock(elapsed) + '.' : prompt());
+    render();
+  }
+
+  var hot = window.claude && window.claude.hot;
+  try {
+    if (hot && hot.snapshot) hot.snapshot(function () {
+      return { order: order, moves: moves, elapsed: elapsed, mode: mode };
+    });
+  } catch (e) {}
+  if (hot && hot.ready) hot.ready(start);
+  else start((hot && hot.data) || {});
+})();
+</script>
+</body>
+</html>
